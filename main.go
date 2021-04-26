@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -11,11 +11,8 @@ import (
 	"time"
 )
 
-var log = logrus.New()
-
 var (
 	dataPath     = ""
-	logFile      = ""
 	instanceFile = ""
 	instanceID   = ""
 )
@@ -30,16 +27,10 @@ func pong(w http.ResponseWriter, req *http.Request) {
 	log.Infof("ping -> pong -> %s", instanceID)
 }
 
-func logcat(writer http.ResponseWriter, request *http.Request) {
-	data, err := ioutil.ReadFile(logFile)
-	if err != nil {
-		fmt.Fprintf(writer, "could not open log file: %s", err)
-	}
-	fmt.Fprint(writer, string(data))
-}
-
-func kill(writer http.ResponseWriter, request *http.Request) {
-	log.Fatal("kill")
+func kill(w http.ResponseWriter, request *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "killing %s", instanceID)
+	log.Fatalf("killing %s", instanceID)
 }
 
 func main() {
@@ -53,19 +44,10 @@ func main() {
 		log.Fatal("DATA_PATH must not be empty")
 	}
 
-	logFile = fmt.Sprintf("%s/log.log", dataPath)
-	lofi, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		log.Fatalf("could not open file %s: %s", logFile, err)
-	}
-	defer lofi.Close()
-	log.Infof("openend log file %s", logFile)
-	log.Out = lofi
-
 	instanceFile = fmt.Sprintf("%s/instance", dataPath)
 	inFi, err := os.OpenFile(instanceFile, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("could not open file %s: %s", logFile, err)
+		log.Fatalf("could not open file %s: %s", instanceFile, err)
 	}
 	defer inFi.Close()
 	rawID, err := ioutil.ReadAll(inFi)
@@ -83,7 +65,6 @@ func main() {
 	}
 
 	http.HandleFunc("/ping", pong)
-	http.HandleFunc("/logcat", logcat)
 	http.HandleFunc("/kill", kill)
 
 	log.Infof("starting http server, listening on %s", addr)
